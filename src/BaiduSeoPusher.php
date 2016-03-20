@@ -17,8 +17,10 @@ class BaiduSeoPusher
 
 	/**
 	 * 推送 url 列表
-	 * @param  string|array $urls
-	 * @param  string       $site
+	 * @param string|array  $urls
+	 * @param string        $site
+	 * @param \Closure|null $success
+	 * @param \Closure|null $failure
 	 * @return string|bool
 	 */
 	public function push($urls, $site = '', \Closure $success = null, \Closure $failure = null)
@@ -34,13 +36,18 @@ class BaiduSeoPusher
 		}
 		$api = sprintf(self::API_PUSH, $site, $this->token, 'original');
 
-		return $this->_execute($api, $urls);
+		$result = $this->_execute($api, $urls, $success, $failure);
+
+
+		return $result;
 	}
 
 	/**
 	 * 更新 url 列表
-	 * @param  string|array $urls
-	 * @param  string       $site
+	 * @param string|array  $urls
+	 * @param string        $site
+	 * @param \Closure|null $success
+	 * @param \Closure|null $failure
 	 * @return string|bool
 	 */
 	public function update($urls, $site = '', \Closure $success = null, \Closure $failure = null)
@@ -56,13 +63,15 @@ class BaiduSeoPusher
 		}
 		$api = sprintf(self::API_UPDATE, $site, $this->token);
 
-		return $this->_execute($api, $urls);
+		return $this->_execute($api, $urls, $success, $failure);
 	}
 
 	/**
 	 * 删除 url 列表
-	 * @param  string|array $urls
-	 * @param  string       $site
+	 * @param string|array  $urls
+	 * @param string        $site
+	 * @param \Closure|null $success
+	 * @param \Closure|null $failure
 	 * @return string|bool
 	 */
 	public function delete($urls, $site = '', \Closure $success = null, \Closure $failure = null)
@@ -78,10 +87,10 @@ class BaiduSeoPusher
 		}
 		$api = sprintf(self::API_DELETE, $site, $this->token);
 
-		return $this->_execute($api, $urls);
+		return $this->_execute($api, $urls, $success, $failure);
 	}
 
-	private function _execute($api, $urls)
+	private function _execute($api, $urls, \Closure $success = null, \Closure $failure = null)
 	{
 		$ch = curl_init();
 
@@ -94,6 +103,25 @@ class BaiduSeoPusher
 		];
 		curl_setopt_array($ch, $options);
 		$response = curl_exec($ch);
+
+		if ($response) {
+			$data = json_decode($response, true);
+			if (array_key_exists('success', $data) && $success) {
+				call_user_func($success, $data);
+			}
+			if (array_key_exists('error', $data) && $failure) {
+				$error          = new \stdClass();
+				$error->code    = $data['error'];
+				$error->message = $data['message'];
+				call_user_func($failure, $error);
+			}
+		}
+		elseif ($failure) {
+			$error          = new \stdClass();
+			$error->code    = -1;
+			$error->message = 'curl failed.';
+			call_user_func($failure, $error);
+		}
 
 		return $response;
 	}
